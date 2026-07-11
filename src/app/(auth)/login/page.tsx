@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
+import { FlashToast } from "@/components/shared/flash-toast";
 import {
   Card,
   CardContent,
@@ -27,6 +29,9 @@ export default async function LoginPage() {
           <LoginForm />
         </CardContent>
       </Card>
+      <Suspense>
+        <FlashToast />
+      </Suspense>
     </main>
   );
 }

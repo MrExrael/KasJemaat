@@ -1,9 +1,11 @@
 "use client";
 
+import type { ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Building2,
+  FileDown,
   HandCoins,
   LayoutDashboard,
   LogOut,
@@ -14,19 +16,26 @@ import {
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { logoutAction } from "@/lib/auth/actions";
+import {
+  navItemsForRole,
+  type NavKey,
+  type Role,
+} from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
 
-const menu = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/pemasukan", label: "Pemasukan", icon: HandCoins },
-  { href: "/pengeluaran", label: "Pengeluaran", icon: Receipt },
-  { href: "/kas-mingguan", label: "Kas Mingguan", icon: Wallet },
-  { href: "/departemen", label: "Departemen", icon: Building2 },
-  { href: "/pengguna", label: "Pengguna", icon: Users },
-] as const;
+const ICONS: Record<NavKey, ComponentType<{ className?: string }>> = {
+  dashboard: LayoutDashboard,
+  pemasukan: HandCoins,
+  pengeluaran: Receipt,
+  "kas-mingguan": Wallet,
+  departemen: Building2,
+  pengguna: Users,
+  ekspor: FileDown,
+};
 
-export function Sidebar({ userEmail }: { userEmail?: string }) {
+export function Sidebar({ role }: { role: Role }) {
   const pathname = usePathname();
+  const items = navItemsForRole(role);
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r bg-card">
@@ -35,11 +44,12 @@ export function Sidebar({ userEmail }: { userEmail?: string }) {
       </div>
 
       <nav className="flex-1 space-y-1 p-3">
-        {menu.map(({ href, label, icon: Icon }) => {
+        {items.map(({ key, href, label }) => {
+          const Icon = ICONS[key];
           const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link
-              key={href}
+              key={key}
               href={href}
               className={cn(
                 buttonVariants({
@@ -56,15 +66,7 @@ export function Sidebar({ userEmail }: { userEmail?: string }) {
         })}
       </nav>
 
-      <div className="space-y-2 border-t p-3">
-        {userEmail ? (
-          <p
-            className="truncate px-1 text-xs text-muted-foreground"
-            title={userEmail}
-          >
-            {userEmail}
-          </p>
-        ) : null}
+      <div className="border-t p-3">
         <form action={logoutAction}>
           <Button
             type="submit"
