@@ -1,0 +1,4 @@
+-- Seed data KasJemaat.
+-- Akan diisi pada fase skema database:
+--   - departments (8 departemen contoh)
+--   - cash_types (Kas Operasional, Pembangunan, Diakonia, Misi)
