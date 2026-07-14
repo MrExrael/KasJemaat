@@ -51,6 +51,30 @@ export function can(role: Role, action: Action): boolean {
   return MATRIX[action].includes(role);
 }
 
+// ---------- Aturan tingkat-baris transaksi (role + status + kepemilikan) ----------
+// Mirror RLS transactions. Baris `approved` terkunci untuk semua.
+type TxStatus = Database["public"]["Enums"]["tx_status"];
+
+export function canEditTransaction(
+  role: Role,
+  opts: { status: TxStatus; isOwner: boolean },
+): boolean {
+  if (opts.status === "approved") return false;
+  if (role === "sekretaris" || role === "bendahara") return true;
+  if (role === "petugas") return opts.isOwner && opts.status === "draft";
+  return false;
+}
+
+export function canDeleteTransaction(role: Role, status: TxStatus): boolean {
+  if (status === "approved") return false;
+  return role === "sekretaris" || role === "bendahara";
+}
+
+export function canVerifyTransaction(role: Role, status: TxStatus): boolean {
+  if (status === "approved") return false;
+  return role === "sekretaris" || role === "bendahara";
+}
+
 // ---------- Navigasi / route ----------
 export type NavKey =
   | "dashboard"

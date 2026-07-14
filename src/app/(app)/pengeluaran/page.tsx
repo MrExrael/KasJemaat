@@ -1,35 +1,47 @@
-import { Plus } from "lucide-react";
+import { redirect } from "next/navigation";
 
-import { RoleGate } from "@/components/shared/role-gate";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { TransactionsView } from "@/components/transactions/transactions-view";
+import { getCurrentProfile } from "@/lib/auth/session";
+import { getTransactionsData } from "@/lib/transactions/queries";
 
-export default function PengeluaranPage() {
+type SearchParams = Promise<{
+  from?: string;
+  to?: string;
+  dept?: string;
+  page?: string;
+}>;
+
+export default async function PengeluaranPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const profile = await getCurrentProfile();
+  if (!profile) redirect("/login");
+
+  const sp = await searchParams;
+  const page = Math.max(1, Number(sp.page) || 1);
+  const data = await getTransactionsData("expense", profile, {
+    from: sp.from,
+    to: sp.to,
+    departmentId: sp.dept,
+    page,
+  });
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div>
         <h1 className="font-heading text-2xl font-semibold">Pengeluaran</h1>
-        <RoleGate action="transactions.input">
-          <Button>
-            <Plus className="size-4" />
-            Tambah Pengeluaran
-          </Button>
-        </RoleGate>
+        <p className="text-muted-foreground">Catatan transaksi pengeluaran.</p>
       </div>
-
-      <Card className="max-w-md">
-        <CardHeader>
-          <CardTitle>Segera hadir</CardTitle>
-          <CardDescription>
-            Daftar & pencatatan pengeluaran dikerjakan pada fase berikutnya.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <TransactionsView
+        type="expense"
+        role={profile.role}
+        userId={profile.id}
+        userDepartmentId={profile.department_id}
+        data={data}
+        filters={{ from: sp.from, to: sp.to, dept: sp.dept }}
+      />
     </div>
   );
 }
