@@ -1,40 +1,34 @@
-import { Plus } from "lucide-react";
-
-import { RoleGate } from "@/components/shared/role-gate";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { can } from "@/lib/auth/permissions";
 import { requireRouteAccess } from "@/lib/auth/session";
+import { createClient } from "@/lib/supabase/server";
+import type { DepartmentRow } from "@/lib/validators/department";
+import { DepartmentsView } from "./departments-view";
 
 export default async function DepartemenPage() {
-  // Gembala/Sekretaris/Bendahara boleh membuka (Petugas ditolak).
-  await requireRouteAccess("departemen");
+  // Gembala/Sekretaris/Bendahara boleh membuka (Petugas ditolak oleh guard).
+  const profile = await requireRouteAccess("departemen");
+  const canManage = can(profile.role, "departments.manage");
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("departments")
+    .select("id, name, code, pic_name, is_active")
+    .order("name", { ascending: true });
+
+  const departments: DepartmentRow[] = data ?? [];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div>
         <h1 className="font-heading text-2xl font-semibold">Departemen</h1>
-        {/* Hanya Sekretaris/Bendahara yang melihat tombol kelola. */}
-        <RoleGate action="departments.manage">
-          <Button>
-            <Plus className="size-4" />
-            Tambah Departemen
-          </Button>
-        </RoleGate>
+        <p className="text-muted-foreground">
+          {canManage
+            ? "Kelola daftar departemen gereja."
+            : "Daftar departemen gereja (hanya lihat)."}
+        </p>
       </div>
 
-      <Card className="max-w-md">
-        <CardHeader>
-          <CardTitle>Segera hadir</CardTitle>
-          <CardDescription>
-            Daftar & pengelolaan departemen dikerjakan pada fase berikutnya.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <DepartmentsView departments={departments} canManage={canManage} />
     </div>
   );
 }
