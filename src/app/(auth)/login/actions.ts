@@ -1,10 +1,9 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { loginSchema } from "@/lib/validators/auth";
 
-export type LoginState = { error?: string };
+export type LoginState = { error?: string; ok?: boolean };
 
 export async function loginAction(
   _prevState: LoginState,
@@ -38,6 +37,7 @@ export async function loginAction(
     };
   }
 
-  // redirect() melempar internal; HARUS di luar try/catch di atas.
-  redirect("/dashboard?login=1");
+  // Sukses. Tidak redirect di server — biar LoginForm menampilkan notif di
+  // halaman login lalu navigasi. Cookie sesi sudah di-set oleh signIn di atas.
+  return { ok: true };
 }

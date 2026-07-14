@@ -5,7 +5,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 const MESSAGES: Record<string, { type: "error" | "success"; text: string }> = {
-  login: { type: "success", text: "Berhasil masuk." },
   denied: { type: "error", text: "Akses ditolak." },
   inactive: { type: "error", text: "Akun Anda dinonaktifkan. Hubungi admin." },
   noprofile: {
@@ -25,11 +24,7 @@ export function FlashToast() {
   const shown = useRef(false);
 
   useEffect(() => {
-    const key = params.get("login")
-      ? "login"
-      : params.get("denied")
-        ? "denied"
-        : params.get("error");
+    const key = params.get("denied") ? "denied" : params.get("error");
     if (!key || shown.current) return;
     const msg = MESSAGES[key];
     if (!msg) return;

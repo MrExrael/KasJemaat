@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { loginAction, type LoginState } from "./actions";
 const initialState: LoginState = {};
 
 export function LoginForm() {
+  const router = useRouter();
   const [state, formAction, isPending] = useActionState(
     loginAction,
     initialState,
@@ -18,9 +20,14 @@ export function LoginForm() {
 
   useEffect(() => {
     if (state?.error) {
+      // Notif GAGAL tampil di halaman login.
       toast.error(state.error);
+    } else if (state?.ok) {
+      // Notif BERHASIL tampil di halaman login, lalu navigasi ke dashboard.
+      toast.success("Berhasil masuk.");
+      router.push("/dashboard");
     }
-  }, [state]);
+  }, [state, router]);
 
   return (
     <form action={formAction} className="space-y-4">
