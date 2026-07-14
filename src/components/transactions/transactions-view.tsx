@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { CheckCircle2, Pencil, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,7 @@ import {
   type Role,
 } from "@/lib/auth/permissions";
 import { deleteTransaction } from "@/lib/transactions/actions";
+import { isPdfPath } from "@/lib/transactions/proof";
 import type { TransactionsData } from "@/lib/transactions/queries";
 import { formatRupiah, formatTanggal } from "@/lib/format";
 import type {
@@ -81,6 +82,9 @@ export function TransactionsView({
   const [editing, setEditing] = useState<TransactionRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TransactionRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [preview, setPreview] = useState<{ url: string; pdf: boolean } | null>(
+    null,
+  );
 
   const deptName = useMemo(() => {
     const map = new Map(data.departments.map((d) => [d.id, d.name]));
@@ -276,6 +280,12 @@ export function TransactionsView({
                 const deletable = canDeleteTransaction(role, row.status);
                 const verifiable = canVerifyTransaction(role, row.status);
                 const s = STATUS[row.status];
+                const proofSigned = row.proof_url
+                  ? data.proofUrls[row.id]
+                  : undefined;
+                const proofIsPdf = row.proof_url
+                  ? isPdfPath(row.proof_url)
+                  : false;
                 return (
                   <TableRow key={row.id}>
                     <TableCell className="whitespace-nowrap">
@@ -290,7 +300,31 @@ export function TransactionsView({
                     <TableCell className="text-right font-medium whitespace-nowrap">
                       {formatRupiah(row.amount)}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">—</TableCell>
+                    <TableCell>
+                      {proofSigned ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPreview({ url: proofSigned, pdf: proofIsPdf })
+                          }
+                          className="flex size-9 items-center justify-center overflow-hidden rounded border bg-muted hover:ring-2 hover:ring-ring"
+                          aria-label="Lihat bukti"
+                        >
+                          {proofIsPdf ? (
+                            <FileText className="size-4 text-muted-foreground" />
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={proofSigned}
+                              alt="Bukti"
+                              className="size-9 object-cover"
+                            />
+                          )}
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={s.variant}>{s.label}</Badge>
                     </TableCell>
@@ -429,6 +463,46 @@ export function TransactionsView({
               {deleting ? "Menghapus…" : "Hapus"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={preview !== null}
+        onOpenChange={(o) => {
+          if (!o) setPreview(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Bukti</DialogTitle>
+            <DialogDescription>Pratinjau bukti transaksi.</DialogDescription>
+          </DialogHeader>
+          {preview && (
+            <div className="space-y-3">
+              {preview.pdf ? (
+                <iframe
+                  src={preview.url}
+                  className="h-[70vh] w-full rounded border"
+                  title="Bukti PDF"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={preview.url}
+                  alt="Bukti"
+                  className="max-h-[70vh] w-full rounded border object-contain"
+                />
+              )}
+              <a
+                href={preview.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex text-sm text-primary underline-offset-4 hover:underline"
+              >
+                Buka di tab baru
+              </a>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

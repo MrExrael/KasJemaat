@@ -15,6 +15,8 @@ export type TransactionsData = {
   totalPages: number;
   departments: RefItem[];
   cashTypes: RefItem[];
+  /** Signed URL bukti per transaksi id (bucket privat, kadaluarsa ~1 jam). */
+  proofUrls: Record<string, string>;
 };
 
 export type TransactionFilters = {
@@ -85,10 +87,26 @@ export async function getTransactionsData(
   const { data: sumRows } = await sumQuery;
   const totalAmount = (sumRows ?? []).reduce((acc, r) => acc + (r.amount ?? 0), 0);
 
+  const rowsData = rows ?? [];
   const totalCount = count ?? 0;
 
+  // Signed URL untuk baca bukti (server-side; storage policy mengotorisasi).
+  const proofUrls: Record<string, string> = {};
+  const withProof = rowsData.filter((r) => r.proof_url);
+  if (withProof.length > 0) {
+    const { data: signed } = await supabase.storage
+      .from("bukti")
+      .createSignedUrls(
+        withProof.map((r) => r.proof_url as string),
+        3600,
+      );
+    signed?.forEach((s, i) => {
+      if (s.signedUrl) proofUrls[withProof[i].id] = s.signedUrl;
+    });
+  }
+
   return {
-    rows: rows ?? [],
+    rows: rowsData,
     totalCount,
     totalAmount,
     page,
@@ -96,5 +114,6 @@ export async function getTransactionsData(
     totalPages: Math.max(1, Math.ceil(totalCount / PAGE_SIZE)),
     departments,
     cashTypes,
+    proofUrls,
   };
 }

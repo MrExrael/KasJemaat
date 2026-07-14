@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   transactionSchema,
   type ActionResult,
+  type CreateResult,
   type TransactionFormValues,
   type TxType,
 } from "@/lib/validators/transaction";
@@ -29,7 +30,7 @@ function mapDbError(error: { code?: string; message?: string }): string {
 export async function createTransaction(
   type: TxType,
   raw: TransactionFormValues,
-): Promise<ActionResult> {
+): Promise<CreateResult> {
   const parsed = transactionSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Input tidak valid." };
@@ -41,17 +42,45 @@ export async function createTransaction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi berakhir. Silakan masuk lagi." };
 
-  const { error } = await supabase.from("transactions").insert({
-    type,
-    date: parsed.data.date,
-    department_id: parsed.data.department_id,
-    cash_type_id: parsed.data.cash_type_id,
-    category: parsed.data.category,
-    description: parsed.data.description,
-    amount: parsed.data.amount,
-    created_by: user.id,
-    status: "draft",
-  });
+  const { data, error } = await supabase
+    .from("transactions")
+    .insert({
+      type,
+      date: parsed.data.date,
+      department_id: parsed.data.department_id,
+      cash_type_id: parsed.data.cash_type_id,
+      category: parsed.data.category,
+      description: parsed.data.description,
+      amount: parsed.data.amount,
+      created_by: user.id,
+      status: "draft",
+    })
+    .select("id")
+    .single();
+  if (error || !data) {
+    return { ok: false, error: error ? mapDbError(error) : "Gagal menyimpan." };
+  }
+
+  revalidatePath(pathFor(type));
+  return { ok: true, id: data.id };
+}
+
+/**
+ * Set/hapus path bukti pada transaksi. Otorisasi via RLS
+ * (petugas hanya miliknya & draft; staff non-approved; approved terkunci).
+ */
+export async function setTransactionProof(
+  id: string,
+  type: TxType,
+  path: string | null,
+): Promise<ActionResult> {
+  if (!id) return { ok: false, error: "Data tidak valid." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("transactions")
+    .update({ proof_url: path })
+    .eq("id", id);
   if (error) return { ok: false, error: mapDbError(error) };
 
   revalidatePath(pathFor(type));

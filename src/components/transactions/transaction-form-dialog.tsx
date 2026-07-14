@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,20 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Role } from "@/lib/auth/permissions";
-import type { RefItem } from "@/lib/transactions/queries";
+import { createClient } from "@/lib/supabase/client";
 import {
   createTransaction,
+  setTransactionProof,
   updateTransaction,
 } from "@/lib/transactions/actions";
+import {
+  BUKTI_BUCKET,
+  compressImage,
+  extForFile,
+  proofPath,
+  validateProofFile,
+} from "@/lib/transactions/proof";
+import type { RefItem } from "@/lib/transactions/queries";
 import {
   transactionSchema,
   type TransactionRow,
@@ -32,11 +41,9 @@ const FIELD_SELECT =
 function onlyDigits(s: string): string {
   return s.replace(/\D/g, "");
 }
-
 function groupThousands(digits: string): string {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
-
 function today(): string {
   const d = new Date();
   const m = `${d.getMonth() + 1}`.padStart(2, "0");
@@ -76,6 +83,9 @@ export function TransactionFormDialog({
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [amountDigits, setAmountDigits] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [removeProof, setRemoveProof] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
 
@@ -89,10 +99,59 @@ export function TransactionFormDialog({
     setCategory(transaction?.category ?? "");
     setDescription(transaction?.description ?? "");
     setAmountDigits(transaction ? String(transaction.amount) : "");
+    setFile(null);
+    setFileError(null);
+    setRemoveProof(false);
     setErrors({});
   }, [open, transaction, lockDept, userDepartmentId]);
 
   const typeLabel = type === "income" ? "Pemasukan" : "Pengeluaran";
+
+  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    if (!f) {
+      setFile(null);
+      return;
+    }
+    const err = validateProofFile(f);
+    if (err) {
+      setFileError(err);
+      setFile(null);
+      e.target.value = "";
+      return;
+    }
+    setFileError(null);
+    setFile(f);
+    setRemoveProof(false);
+  }
+
+  /** Unggah/hapus bukti setelah transaksi tersimpan. Best-effort. */
+  async function syncProof(txId: string, deptId: string): Promise<void> {
+    const supabase = createClient();
+
+    if (file) {
+      const toUpload = await compressImage(file);
+      const path = proofPath(deptId, txId, extForFile(toUpload));
+      const { error: upErr } = await supabase.storage
+        .from(BUKTI_BUCKET)
+        .upload(path, toUpload, {
+          upsert: true,
+          contentType: toUpload.type,
+        });
+      if (upErr) {
+        toast.error("Transaksi tersimpan, tetapi bukti gagal diunggah.");
+        return;
+      }
+      const pr = await setTransactionProof(txId, type, path);
+      if (!pr.ok) toast.error(pr.error);
+      return;
+    }
+
+    if (isEdit && removeProof && transaction?.proof_url) {
+      await supabase.storage.from(BUKTI_BUCKET).remove([transaction.proof_url]);
+      await setTransactionProof(txId, type, null);
+    }
+  }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -121,23 +180,34 @@ export function TransactionFormDialog({
     setErrors({});
     setPending(true);
     try {
-      const res =
-        isEdit && transaction
-          ? await updateTransaction(transaction.id, type, values)
-          : await createTransaction(type, values);
-      if (res.ok) {
-        toast.success(
-          isEdit ? "Transaksi diperbarui." : `${typeLabel} ditambahkan.`,
-        );
-        onOpenChange(false);
-        onSaved();
+      let txId: string;
+      if (isEdit && transaction) {
+        const res = await updateTransaction(transaction.id, type, values);
+        if (!res.ok) {
+          toast.error(res.error);
+          return;
+        }
+        txId = transaction.id;
       } else {
-        toast.error(res.error);
+        const res = await createTransaction(type, values);
+        if (!res.ok) {
+          toast.error(res.error);
+          return;
+        }
+        txId = res.id;
       }
+
+      await syncProof(txId, values.department_id);
+
+      toast.success(isEdit ? "Transaksi diperbarui." : `${typeLabel} ditambahkan.`);
+      onOpenChange(false);
+      onSaved();
     } finally {
       setPending(false);
     }
   }
+
+  const hasExistingProof = isEdit && Boolean(transaction?.proof_url);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -250,11 +320,55 @@ export function TransactionFormDialog({
             />
           </div>
 
+          {/* Bukti */}
           <div className="space-y-2">
-            <Label>Bukti</Label>
-            <div className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
-              Unggah bukti tersedia di Fase 5.
-            </div>
+            <Label htmlFor="tx-proof">Bukti (opsional)</Label>
+            {hasExistingProof && !file && !removeProof && (
+              <div className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+                <span className="text-muted-foreground">
+                  Bukti sudah terlampir.
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setRemoveProof(true)}
+                >
+                  Hapus
+                </Button>
+              </div>
+            )}
+            {hasExistingProof && removeProof && !file && (
+              <div className="flex items-center justify-between rounded-lg border border-dashed px-3 py-2 text-sm">
+                <span className="text-destructive">Bukti akan dihapus.</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setRemoveProof(false)}
+                >
+                  Batal
+                </Button>
+              </div>
+            )}
+            <input
+              id="tx-proof"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              onChange={handleFileChange}
+              className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-input file:bg-transparent file:px-3 file:py-1 file:text-sm hover:file:bg-muted"
+            />
+            {file && (
+              <p className="text-xs text-muted-foreground">
+                {file.name} • {(file.size / 1024 / 1024).toFixed(2)} MB
+              </p>
+            )}
+            {fileError && (
+              <p className="text-xs text-destructive">{fileError}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              JPG/PNG/WEBP/PDF, maksimal 5MB.
+            </p>
           </div>
 
           <DialogFooter>
