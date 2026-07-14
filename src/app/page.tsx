@@ -9,6 +9,7 @@ import {
   Wallet,
 } from "lucide-react";
 
+import { HeroMockup } from "@/components/landing/hero-mockup";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { buttonVariants } from "@/components/ui/button";
 import { APP_VERSION } from "@/lib/changelog";
@@ -97,6 +98,10 @@ export default function Home() {
                 <ArrowRight className="size-4" />
               </Link>
             </div>
+          </div>
+
+          <div className="mx-auto max-w-5xl px-4 pb-16 sm:pb-24">
+            <HeroMockup />
           </div>
         </section>
 
