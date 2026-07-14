@@ -1,40 +1,63 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { loginAction, type LoginState } from "./actions";
-
-const initialState: LoginState = {};
+import { createClient } from "@/lib/supabase/client";
+import { loginSchema } from "@/lib/validators/auth";
 
 export function LoginForm() {
-  const router = useRouter();
+  const [pending, setPending] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
-  const [state, formAction, isPending] = useActionState(
-    loginAction,
-    initialState,
-  );
 
-  useEffect(() => {
-    if (state?.error) {
-      // Notif GAGAL tampil di halaman login.
-      toast.error(state.error);
-    } else if (state?.ok) {
-      // Notif BERHASIL tampil di halaman login, tahan sebentar agar terlihat,
-      // baru navigasi ke dashboard.
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const parsed = loginSchema.safeParse({
+      email: form.get("email"),
+      password: form.get("password"),
+    });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Input tidak valid.");
+      return;
+    }
+
+    setPending(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: parsed.data.email,
+        password: parsed.data.password,
+      });
+
+      if (error) {
+        if (error.message?.toLowerCase().includes("not confirmed")) {
+          toast.error("Email belum dikonfirmasi. Hubungi admin.");
+        } else {
+          toast.error("Email atau kata sandi salah.");
+        }
+        setPending(false);
+        return;
+      }
+
+      // Sukses: notif tampil DI halaman login (form tetap ter-mount karena
+      // tidak ada Server Action yang me-redirect), tahan sebentar lalu masuk.
       toast.success("Berhasil masuk.");
       setRedirecting(true);
-      const t = setTimeout(() => router.push("/dashboard"), 800);
-      return () => clearTimeout(t);
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 900);
+    } catch {
+      toast.error("Gagal terhubung ke server. Periksa koneksi.");
+      setPending(false);
     }
-  }, [state, router]);
+  }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
@@ -60,9 +83,9 @@ export function LoginForm() {
         type="submit"
         size="lg"
         className="w-full"
-        disabled={isPending || redirecting}
+        disabled={pending || redirecting}
       >
-        {isPending ? "Memproses…" : redirecting ? "Mengalihkan…" : "Masuk"}
+        {redirecting ? "Mengalihkan…" : pending ? "Memproses…" : "Masuk"}
       </Button>
     </form>
   );
