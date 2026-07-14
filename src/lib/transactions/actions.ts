@@ -130,3 +130,46 @@ export async function deleteTransaction(
   revalidatePath(pathFor(type));
   return { ok: true };
 }
+
+// ---------- Transisi status (via fungsi SECURITY DEFINER, catat audit_log) ----------
+
+export async function verifyTransaction(
+  id: string,
+  type: TxType,
+): Promise<ActionResult> {
+  if (!id) return { ok: false, error: "Data tidak valid." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("verify_transaction", { p_id: id });
+  if (error) return { ok: false, error: error.message || "Gagal memproses." };
+  revalidatePath(pathFor(type));
+  return { ok: true };
+}
+
+export async function approveTransaction(
+  id: string,
+  type: TxType,
+): Promise<ActionResult> {
+  if (!id) return { ok: false, error: "Data tidak valid." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("approve_transaction", { p_id: id });
+  if (error) return { ok: false, error: error.message || "Gagal memproses." };
+  revalidatePath(pathFor(type));
+  return { ok: true };
+}
+
+export async function revertTransaction(
+  id: string,
+  type: TxType,
+  reason: string,
+): Promise<ActionResult> {
+  if (!id) return { ok: false, error: "Data tidak valid." };
+  if (!reason.trim()) return { ok: false, error: "Alasan wajib diisi." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("revert_transaction", {
+    p_id: id,
+    p_reason: reason.trim(),
+  });
+  if (error) return { ok: false, error: error.message || "Gagal memproses." };
+  revalidatePath(pathFor(type));
+  return { ok: true };
+}

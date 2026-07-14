@@ -1,6 +1,10 @@
 import type { Profile } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import type { TransactionRow, TxType } from "@/lib/validators/transaction";
+import type {
+  TransactionRow,
+  TxStatus,
+  TxType,
+} from "@/lib/validators/transaction";
 
 export const PAGE_SIZE = 10;
 
@@ -17,12 +21,15 @@ export type TransactionsData = {
   cashTypes: RefItem[];
   /** Signed URL bukti per transaksi id (bucket privat, kadaluarsa ~1 jam). */
   proofUrls: Record<string, string>;
+  /** Nama pemverifikasi per transaksi id (untuk jejak status). */
+  verifierNames: Record<string, string>;
 };
 
 export type TransactionFilters = {
   from?: string;
   to?: string;
   departmentId?: string;
+  status?: string;
   page: number;
 };
 
@@ -59,6 +66,14 @@ export async function getTransactionsData(
       ? requestedDept
       : undefined;
 
+  const statusFilter =
+    filters.status &&
+    (["draft", "verified", "approved"] as const).includes(
+      filters.status as TxStatus,
+    )
+      ? (filters.status as TxStatus)
+      : undefined;
+
   const page = Math.max(1, filters.page);
   const fromIdx = (page - 1) * PAGE_SIZE;
   const toIdx = fromIdx + PAGE_SIZE - 1;
@@ -66,13 +81,14 @@ export async function getTransactionsData(
   let rowsQuery = supabase
     .from("transactions")
     .select(
-      "id, date, department_id, cash_type_id, type, amount, category, description, proof_url, status, created_by",
+      "id, date, department_id, cash_type_id, type, amount, category, description, proof_url, status, created_by, verified_by, verified_at",
       { count: "exact" },
     )
     .eq("type", type);
   if (filters.from) rowsQuery = rowsQuery.gte("date", filters.from);
   if (filters.to) rowsQuery = rowsQuery.lte("date", filters.to);
   if (departmentId) rowsQuery = rowsQuery.eq("department_id", departmentId);
+  if (statusFilter) rowsQuery = rowsQuery.eq("status", statusFilter);
 
   const { data: rows, count } = await rowsQuery
     .order("date", { ascending: false })
@@ -84,6 +100,7 @@ export async function getTransactionsData(
   if (filters.from) sumQuery = sumQuery.gte("date", filters.from);
   if (filters.to) sumQuery = sumQuery.lte("date", filters.to);
   if (departmentId) sumQuery = sumQuery.eq("department_id", departmentId);
+  if (statusFilter) sumQuery = sumQuery.eq("status", statusFilter);
   const { data: sumRows } = await sumQuery;
   const totalAmount = (sumRows ?? []).reduce((acc, r) => acc + (r.amount ?? 0), 0);
 
@@ -105,6 +122,24 @@ export async function getTransactionsData(
     });
   }
 
+  // Nama pemverifikasi (jejak "Diverifikasi oleh ..."). Tunduk RLS profiles:
+  // staff/gembala lihat semua; petugas bisa kosong → UI fallback ke tanggal.
+  const verifierNames: Record<string, string> = {};
+  const verifierIds = [
+    ...new Set(
+      rowsData.map((r) => r.verified_by).filter((x): x is string => Boolean(x)),
+    ),
+  ];
+  if (verifierIds.length > 0) {
+    const { data: profs } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", verifierIds);
+    profs?.forEach((p) => {
+      if (p.full_name) verifierNames[p.id] = p.full_name;
+    });
+  }
+
   return {
     rows: rowsData,
     totalCount,
@@ -115,5 +150,6 @@ export async function getTransactionsData(
     departments,
     cashTypes,
     proofUrls,
+    verifierNames,
   };
 }

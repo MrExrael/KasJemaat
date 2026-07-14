@@ -52,6 +52,8 @@ export type TransactionRow = Pick<
   | "proof_url"
   | "status"
   | "created_by"
+  | "verified_by"
+  | "verified_at"
 >;
 
 export type ActionResult = { ok: true } | { ok: false; error: string };

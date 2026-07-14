@@ -2,7 +2,15 @@
 
 import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { CheckCircle2, FileText, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  CheckCircle2,
+  FileText,
+  LockOpen,
+  Pencil,
+  Plus,
+  ShieldCheck,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -26,12 +36,19 @@ import {
 } from "@/components/ui/table";
 import {
   can,
+  canApproveTransaction,
   canDeleteTransaction,
   canEditTransaction,
+  canRevertTransaction,
   canVerifyTransaction,
   type Role,
 } from "@/lib/auth/permissions";
-import { deleteTransaction } from "@/lib/transactions/actions";
+import {
+  approveTransaction,
+  deleteTransaction,
+  revertTransaction,
+  verifyTransaction,
+} from "@/lib/transactions/actions";
 import { isPdfPath } from "@/lib/transactions/proof";
 import type { TransactionsData } from "@/lib/transactions/queries";
 import { formatRupiah, formatTanggal } from "@/lib/format";
@@ -40,18 +57,22 @@ import type {
   TxStatus,
   TxType,
 } from "@/lib/validators/transaction";
+import { cn } from "@/lib/utils";
 import { TransactionFormDialog } from "./transaction-form-dialog";
 
 const FIELD =
   "flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30";
 
-const STATUS: Record<
-  TxStatus,
-  { label: string; variant: "outline" | "secondary" | "default" }
-> = {
-  draft: { label: "Draft", variant: "outline" },
-  verified: { label: "Terverifikasi", variant: "secondary" },
-  approved: { label: "Disetujui", variant: "default" },
+const STATUS_STYLE: Record<TxStatus, { label: string; className: string }> = {
+  draft: { label: "Draft", className: "bg-muted text-muted-foreground" },
+  verified: {
+    label: "Terverifikasi",
+    className: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  },
+  approved: {
+    label: "Disetujui",
+    className: "bg-green-500/10 text-green-600 dark:text-green-400",
+  },
 };
 
 type Props = {
@@ -60,7 +81,7 @@ type Props = {
   userId: string;
   userDepartmentId: string | null;
   data: TransactionsData;
-  filters: { from?: string; to?: string; dept?: string };
+  filters: { from?: string; to?: string; dept?: string; status?: string };
 };
 
 export function TransactionsView({
@@ -77,6 +98,7 @@ export function TransactionsView({
   const [fromDate, setFromDate] = useState(filters.from ?? "");
   const [toDate, setToDate] = useState(filters.to ?? "");
   const [deptFilter, setDeptFilter] = useState(filters.dept ?? "");
+  const [statusFilter, setStatusFilter] = useState(filters.status ?? "");
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<TransactionRow | null>(null);
@@ -85,6 +107,14 @@ export function TransactionsView({
   const [preview, setPreview] = useState<{ url: string; pdf: boolean } | null>(
     null,
   );
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [approveTarget, setApproveTarget] = useState<TransactionRow | null>(
+    null,
+  );
+  const [approving, setApproving] = useState(false);
+  const [revertTarget, setRevertTarget] = useState<TransactionRow | null>(null);
+  const [revertReason, setRevertReason] = useState("");
+  const [reverting, setReverting] = useState(false);
 
   const deptName = useMemo(() => {
     const map = new Map(data.departments.map((d) => [d.id, d.name]));
@@ -108,12 +138,14 @@ export function TransactionsView({
     from?: string;
     to?: string;
     dept?: string;
+    status?: string;
     page: number;
   }): string {
     const sp = new URLSearchParams();
     if (f.from) sp.set("from", f.from);
     if (f.to) sp.set("to", f.to);
     if (f.dept) sp.set("dept", f.dept);
+    if (f.status) sp.set("status", f.status);
     if (f.page > 1) sp.set("page", String(f.page));
     const qs = sp.toString();
     return qs ? `${pathname}?${qs}` : pathname;
@@ -125,6 +157,7 @@ export function TransactionsView({
         from: fromDate || undefined,
         to: toDate || undefined,
         dept: isPetugas ? undefined : deptFilter || undefined,
+        status: statusFilter || undefined,
         page: 1,
       }),
     );
@@ -134,6 +167,7 @@ export function TransactionsView({
     setFromDate("");
     setToDate("");
     setDeptFilter("");
+    setStatusFilter("");
     router.push(pathname);
   }
 
@@ -143,6 +177,7 @@ export function TransactionsView({
         from: filters.from,
         to: filters.to,
         dept: isPetugas ? undefined : filters.dept,
+        status: filters.status,
         page,
       }),
     );
@@ -171,6 +206,60 @@ export function TransactionsView({
       }
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleVerify(row: TransactionRow) {
+    setBusyId(row.id);
+    try {
+      const res = await verifyTransaction(row.id, type);
+      if (res.ok) {
+        toast.success("Transaksi diverifikasi.");
+        router.refresh();
+      } else {
+        toast.error(res.error);
+      }
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleApprove() {
+    if (!approveTarget) return;
+    setApproving(true);
+    try {
+      const res = await approveTransaction(approveTarget.id, type);
+      if (res.ok) {
+        toast.success("Transaksi disahkan.");
+        setApproveTarget(null);
+        router.refresh();
+      } else {
+        toast.error(res.error);
+      }
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  async function handleRevert() {
+    if (!revertTarget) return;
+    if (!revertReason.trim()) {
+      toast.error("Alasan wajib diisi.");
+      return;
+    }
+    setReverting(true);
+    try {
+      const res = await revertTransaction(revertTarget.id, type, revertReason);
+      if (res.ok) {
+        toast.success("Transaksi dibuka kembali ke draft.");
+        setRevertTarget(null);
+        setRevertReason("");
+        router.refresh();
+      } else {
+        toast.error(res.error);
+      }
+    } finally {
+      setReverting(false);
     }
   }
 
@@ -230,6 +319,22 @@ export function TransactionsView({
             </select>
           )}
         </div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground" htmlFor="f-status">
+            Status
+          </label>
+          <select
+            id="f-status"
+            className={FIELD}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">Semua status</option>
+            <option value="draft">Draft</option>
+            <option value="verified">Terverifikasi</option>
+            <option value="approved">Disetujui</option>
+          </select>
+        </div>
         <Button variant="secondary" onClick={applyFilters}>
           Terapkan
         </Button>
@@ -279,13 +384,21 @@ export function TransactionsView({
                 });
                 const deletable = canDeleteTransaction(role, row.status);
                 const verifiable = canVerifyTransaction(role, row.status);
-                const s = STATUS[row.status];
+                const approvable = canApproveTransaction(role, row.status);
+                const revertable = canRevertTransaction(role, row.status);
+                const hasAction =
+                  editable ||
+                  deletable ||
+                  verifiable ||
+                  approvable ||
+                  revertable;
                 const proofSigned = row.proof_url
                   ? data.proofUrls[row.id]
                   : undefined;
                 const proofIsPdf = row.proof_url
                   ? isPdfPath(row.proof_url)
                   : false;
+                const st = STATUS_STYLE[row.status];
                 return (
                   <TableRow key={row.id}>
                     <TableCell className="whitespace-nowrap">
@@ -326,7 +439,20 @@ export function TransactionsView({
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={s.variant}>{s.label}</Badge>
+                      <Badge
+                        variant="outline"
+                        className={cn("border-transparent", st.className)}
+                      >
+                        {st.label}
+                      </Badge>
+                      {row.status !== "draft" && row.verified_at && (
+                        <span className="mt-1 block text-[11px] text-muted-foreground">
+                          {data.verifierNames[row.id]
+                            ? `oleh ${data.verifierNames[row.id]} • `
+                            : ""}
+                          {formatTanggal(row.verified_at, "d MMM yyyy")}
+                        </span>
+                      )}
                     </TableCell>
                     {showActions && (
                       <TableCell className="text-right">
@@ -337,6 +463,7 @@ export function TransactionsView({
                               size="icon-sm"
                               onClick={() => openEdit(row)}
                               aria-label="Edit"
+                              title="Edit"
                             >
                               <Pencil className="size-4" />
                             </Button>
@@ -345,14 +472,34 @@ export function TransactionsView({
                             <Button
                               variant="ghost"
                               size="icon-sm"
-                              onClick={() =>
-                                toast.info(
-                                  "Verifikasi & persetujuan hadir di Fase 6.",
-                                )
-                              }
+                              onClick={() => handleVerify(row)}
+                              disabled={busyId === row.id}
                               aria-label="Verifikasi"
+                              title="Verifikasi"
                             >
-                              <CheckCircle2 className="size-4" />
+                              <CheckCircle2 className="size-4 text-blue-600 dark:text-blue-400" />
+                            </Button>
+                          )}
+                          {approvable && (
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => setApproveTarget(row)}
+                              aria-label="Sahkan"
+                              title="Sahkan"
+                            >
+                              <ShieldCheck className="size-4 text-green-600 dark:text-green-400" />
+                            </Button>
+                          )}
+                          {revertable && (
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => setRevertTarget(row)}
+                              aria-label="Buka kunci"
+                              title="Buka kunci"
+                            >
+                              <LockOpen className="size-4 text-amber-600 dark:text-amber-400" />
                             </Button>
                           )}
                           {deletable && (
@@ -361,11 +508,12 @@ export function TransactionsView({
                               size="icon-sm"
                               onClick={() => setDeleteTarget(row)}
                               aria-label="Hapus"
+                              title="Hapus"
                             >
                               <Trash2 className="size-4 text-destructive" />
                             </Button>
                           )}
-                          {!editable && !verifiable && !deletable && (
+                          {!hasAction && (
                             <span className="text-muted-foreground">—</span>
                           )}
                         </div>
@@ -432,6 +580,7 @@ export function TransactionsView({
         />
       )}
 
+      {/* Konfirmasi hapus */}
       <Dialog
         open={deleteTarget !== null}
         onOpenChange={(o) => {
@@ -466,6 +615,87 @@ export function TransactionsView({
         </DialogContent>
       </Dialog>
 
+      {/* Konfirmasi sahkan */}
+      <Dialog
+        open={approveTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) setApproveTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sahkan transaksi?</DialogTitle>
+            <DialogDescription>
+              {approveTarget
+                ? `Transaksi ${formatTanggal(approveTarget.date)} sebesar ${formatRupiah(approveTarget.amount)} akan disahkan dan TERKUNCI — tidak bisa diedit/dihapus lagi.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setApproveTarget(null)}
+              disabled={approving}
+            >
+              Batal
+            </Button>
+            <Button onClick={handleApprove} disabled={approving}>
+              {approving ? "Memproses…" : "Sahkan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Buka kunci (revert) */}
+      <Dialog
+        open={revertTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setRevertTarget(null);
+            setRevertReason("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Buka kunci transaksi?</DialogTitle>
+            <DialogDescription>
+              Status akan kembali ke draft dan bisa diedit lagi. Tindakan ini
+              dicatat pada log audit.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="revert-reason">Alasan</Label>
+            <Input
+              id="revert-reason"
+              value={revertReason}
+              onChange={(e) => setRevertReason(e.target.value)}
+              placeholder="mis. koreksi nominal"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRevertTarget(null);
+                setRevertReason("");
+              }}
+              disabled={reverting}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRevert}
+              disabled={reverting}
+            >
+              {reverting ? "Memproses…" : "Buka kunci"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview bukti */}
       <Dialog
         open={preview !== null}
         onOpenChange={(o) => {

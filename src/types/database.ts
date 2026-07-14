@@ -314,6 +314,12 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
+      verify_transaction: { Args: { p_id: string }; Returns: undefined };
+      approve_transaction: { Args: { p_id: string }; Returns: undefined };
+      revert_transaction: {
+        Args: { p_id: string; p_reason: string };
+        Returns: undefined;
+      };
     };
     Enums: {
       user_role: "gembala" | "sekretaris" | "bendahara" | "petugas";

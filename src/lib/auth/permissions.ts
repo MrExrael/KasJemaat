@@ -70,9 +70,23 @@ export function canDeleteTransaction(role: Role, status: TxStatus): boolean {
   return role === "sekretaris" || role === "bendahara";
 }
 
+/** draft -> verified (sekretaris/bendahara). */
 export function canVerifyTransaction(role: Role, status: TxStatus): boolean {
-  if (status === "approved") return false;
-  return role === "sekretaris" || role === "bendahara";
+  return status === "draft" && (role === "sekretaris" || role === "bendahara");
+}
+
+/** verified -> approved (sekretaris/bendahara). */
+export function canApproveTransaction(role: Role, status: TxStatus): boolean {
+  return (
+    status === "verified" && (role === "sekretaris" || role === "bendahara")
+  );
+}
+
+/** verified/approved -> draft (buka kunci; hanya sekretaris). */
+export function canRevertTransaction(role: Role, status: TxStatus): boolean {
+  return (
+    role === "sekretaris" && (status === "verified" || status === "approved")
+  );
 }
 
 // ---------- Navigasi / route ----------

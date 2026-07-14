@@ -8,6 +8,7 @@ type SearchParams = Promise<{
   from?: string;
   to?: string;
   dept?: string;
+  status?: string;
   page?: string;
 }>;
 
@@ -25,6 +26,7 @@ export default async function PemasukanPage({
     from: sp.from,
     to: sp.to,
     departmentId: sp.dept,
+    status: sp.status,
     page,
   });
 
@@ -40,7 +42,7 @@ export default async function PemasukanPage({
         userId={profile.id}
         userDepartmentId={profile.department_id}
         data={data}
-        filters={{ from: sp.from, to: sp.to, dept: sp.dept }}
+        filters={{ from: sp.from, to: sp.to, dept: sp.dept, status: sp.status }}
       />
     </div>
   );
