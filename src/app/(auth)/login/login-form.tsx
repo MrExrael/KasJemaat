@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -13,6 +13,7 @@ const initialState: LoginState = {};
 
 export function LoginForm() {
   const router = useRouter();
+  const [redirecting, setRedirecting] = useState(false);
   const [state, formAction, isPending] = useActionState(
     loginAction,
     initialState,
@@ -23,9 +24,12 @@ export function LoginForm() {
       // Notif GAGAL tampil di halaman login.
       toast.error(state.error);
     } else if (state?.ok) {
-      // Notif BERHASIL tampil di halaman login, lalu navigasi ke dashboard.
+      // Notif BERHASIL tampil di halaman login, tahan sebentar agar terlihat,
+      // baru navigasi ke dashboard.
       toast.success("Berhasil masuk.");
-      router.push("/dashboard");
+      setRedirecting(true);
+      const t = setTimeout(() => router.push("/dashboard"), 800);
+      return () => clearTimeout(t);
     }
   }, [state, router]);
 
@@ -56,9 +60,9 @@ export function LoginForm() {
         type="submit"
         size="lg"
         className="w-full"
-        disabled={isPending}
+        disabled={isPending || redirecting}
       >
-        {isPending ? "Memproses…" : "Masuk"}
+        {isPending ? "Memproses…" : redirecting ? "Mengalihkan…" : "Masuk"}
       </Button>
     </form>
   );
