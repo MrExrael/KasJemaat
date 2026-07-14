@@ -1,3 +1,5 @@
+Dibuat Full Oleh Claude Ai
+
 **KasJemaat** — aplikasi web keuangan & kas gereja (RBAC) berbasis [Next.js](https://nextjs.org) + Supabase.
 
 ## Environment
