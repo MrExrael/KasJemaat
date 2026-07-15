@@ -1,5 +1,7 @@
+import { endOfMonth, format, startOfMonth } from "date-fns";
 import { redirect } from "next/navigation";
 
+import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import { TransactionsView } from "@/components/transactions/transactions-view";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { getTransactionsData } from "@/lib/transactions/queries";
@@ -32,9 +34,18 @@ export default async function PemasukanPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold">Pemasukan</h1>
-        <p className="text-muted-foreground">Catatan transaksi pemasukan.</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-2xl font-semibold">Pemasukan</h1>
+          <p className="text-muted-foreground">Catatan transaksi pemasukan.</p>
+        </div>
+        {/* Menghormati filter tanggal & departemen yang aktif */}
+        <ExportPdfButton
+          variant="range"
+          from={sp.from ?? format(startOfMonth(new Date()), "yyyy-MM-dd")}
+          to={sp.to ?? format(endOfMonth(new Date()), "yyyy-MM-dd")}
+          dept={sp.dept}
+        />
       </div>
       <TransactionsView
         type="income"

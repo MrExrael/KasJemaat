@@ -131,7 +131,9 @@ const ROLE_NAV: Record<Role, NavKey[]> = {
     "departemen",
     "ekspor",
   ],
-  petugas: ["dashboard", "pemasukan", "pengeluaran"],
+  // Petugas boleh ekspor (CLAUDE.md: "Ekspor PDF: semua") — datanya otomatis
+  // terbatas pada departemennya sendiri lewat RLS.
+  petugas: ["dashboard", "pemasukan", "pengeluaran", "ekspor"],
 };
 
 export function navItemsForRole(role: Role): NavItem[] {

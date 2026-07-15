@@ -1,5 +1,6 @@
 import { endOfMonth, format, startOfMonth } from "date-fns";
 
+import { ExportPdfButton } from "@/components/shared/export-pdf-button";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -64,14 +65,23 @@ export default async function DashboardPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold">Dashboard</h1>
-        <p className="text-muted-foreground">
-          {profile.role === "petugas"
-            ? "Ringkasan departemen Anda."
-            : "Ringkasan seluruh kas jemaat."}{" "}
-          Periode {periodLabel}.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-2xl font-semibold">Dashboard</h1>
+          <p className="text-muted-foreground">
+            {profile.role === "petugas"
+              ? "Ringkasan departemen Anda."
+              : "Ringkasan seluruh kas jemaat."}{" "}
+            Periode {periodLabel}.
+          </p>
+        </div>
+        {/* Menghormati periode aktif */}
+        <ExportPdfButton
+          variant="monthly"
+          from={from}
+          to={to}
+          label="Ekspor PDF"
+        />
       </div>
 
       <PeriodFilter from={from} to={to} />
