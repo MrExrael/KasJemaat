@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   LogOut,
   Receipt,
+  ScrollText,
   Users,
   Wallet,
 } from "lucide-react";
@@ -30,6 +31,7 @@ const ICONS: Record<NavKey, ComponentType<{ className?: string }>> = {
   "kas-mingguan": Wallet,
   departemen: Building2,
   pengguna: Users,
+  audit: ScrollText,
   ekspor: FileDown,
 };
 

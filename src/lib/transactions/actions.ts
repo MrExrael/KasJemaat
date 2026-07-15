@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { logAction } from "@/lib/audit/log";
 import { createClient } from "@/lib/supabase/server";
 import {
   transactionSchema,
@@ -61,6 +62,13 @@ export async function createTransaction(
     return { ok: false, error: error ? mapDbError(error) : "Gagal menyimpan." };
   }
 
+  await logAction(supabase, user.id, {
+    action: "create",
+    entity: "transaction",
+    entity_id: data.id,
+    meta: { type, date: parsed.data.date, amount: parsed.data.amount },
+  });
+
   revalidatePath(pathFor(type));
   return { ok: true, id: data.id };
 }
@@ -77,11 +85,23 @@ export async function setTransactionProof(
   if (!id) return { ok: false, error: "Data tidak valid." };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi berakhir. Silakan masuk lagi." };
+
   const { error } = await supabase
     .from("transactions")
     .update({ proof_url: path })
     .eq("id", id);
   if (error) return { ok: false, error: mapDbError(error) };
+
+  await logAction(supabase, user.id, {
+    action: path ? "proof_set" : "proof_remove",
+    entity: "transaction",
+    entity_id: id,
+    meta: path ? { path } : undefined,
+  });
 
   revalidatePath(pathFor(type));
   return { ok: true };
@@ -100,6 +120,11 @@ export async function updateTransaction(
   }
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi berakhir. Silakan masuk lagi." };
+
   const { error } = await supabase
     .from("transactions")
     .update({
@@ -113,6 +138,13 @@ export async function updateTransaction(
     .eq("id", id);
   if (error) return { ok: false, error: mapDbError(error) };
 
+  await logAction(supabase, user.id, {
+    action: "update",
+    entity: "transaction",
+    entity_id: id,
+    meta: { type, date: parsed.data.date, amount: parsed.data.amount },
+  });
+
   revalidatePath(pathFor(type));
   return { ok: true };
 }
@@ -124,8 +156,20 @@ export async function deleteTransaction(
   if (!id) return { ok: false, error: "Data tidak valid." };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi berakhir. Silakan masuk lagi." };
+
   const { error } = await supabase.from("transactions").delete().eq("id", id);
   if (error) return { ok: false, error: mapDbError(error) };
+
+  await logAction(supabase, user.id, {
+    action: "delete",
+    entity: "transaction",
+    entity_id: id,
+    meta: { type },
+  });
 
   revalidatePath(pathFor(type));
   return { ok: true };

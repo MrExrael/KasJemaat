@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { logAction } from "@/lib/audit/log";
 import { createClient } from "@/lib/supabase/server";
 import {
   departmentSchema,
@@ -35,13 +36,29 @@ export async function createDepartment(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("departments").insert({
-    name: parsed.data.name,
-    code: parsed.data.code,
-    pic_name: parsed.data.pic_name,
-    is_active: parsed.data.is_active,
-  });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi berakhir. Silakan masuk lagi." };
+
+  const { data, error } = await supabase
+    .from("departments")
+    .insert({
+      name: parsed.data.name,
+      code: parsed.data.code,
+      pic_name: parsed.data.pic_name,
+      is_active: parsed.data.is_active,
+    })
+    .select("id")
+    .single();
   if (error) return { ok: false, error: mapDbError(error) };
+
+  await logAction(supabase, user.id, {
+    action: "create",
+    entity: "department",
+    entity_id: data?.id ?? null,
+    meta: { name: parsed.data.name, code: parsed.data.code },
+  });
 
   revalidatePath("/departemen");
   return { ok: true };
@@ -59,6 +76,11 @@ export async function updateDepartment(
   }
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi berakhir. Silakan masuk lagi." };
+
   const { error } = await supabase
     .from("departments")
     .update({
@@ -69,6 +91,13 @@ export async function updateDepartment(
     })
     .eq("id", id);
   if (error) return { ok: false, error: mapDbError(error) };
+
+  await logAction(supabase, user.id, {
+    action: "update",
+    entity: "department",
+    entity_id: id,
+    meta: { name: parsed.data.name, code: parsed.data.code },
+  });
 
   revalidatePath("/departemen");
   return { ok: true };
@@ -82,6 +111,10 @@ export async function deleteDepartment(id: string): Promise<DeleteResult> {
   if (!id) return { ok: false, error: "Data tidak valid." };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi berakhir. Silakan masuk lagi." };
 
   const { count, error: countError } = await supabase
     .from("transactions")
@@ -96,12 +129,25 @@ export async function deleteDepartment(id: string): Promise<DeleteResult> {
       .eq("id", id);
     if (error) return { ok: false, error: mapDbError(error) };
 
+    await logAction(supabase, user.id, {
+      action: "deactivate",
+      entity: "department",
+      entity_id: id,
+      meta: { reason: "masih dipakai transaksi (soft delete)" },
+    });
+
     revalidatePath("/departemen");
     return { ok: true, softDeleted: true };
   }
 
   const { error } = await supabase.from("departments").delete().eq("id", id);
   if (error) return { ok: false, error: mapDbError(error) };
+
+  await logAction(supabase, user.id, {
+    action: "delete",
+    entity: "department",
+    entity_id: id,
+  });
 
   revalidatePath("/departemen");
   return { ok: true, softDeleted: false };

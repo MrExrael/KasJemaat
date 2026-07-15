@@ -1,4 +1,4 @@
-export const APP_VERSION = "2.6.0";
+export const APP_VERSION = "2.7.0";
 
 export type ChangelogEntry = {
   version: string;
@@ -14,6 +14,15 @@ export type ChangelogEntry = {
  * Bump juga "version" di package.json agar seragam.
  */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.7.0",
+    date: "2026-07-15",
+    items: [
+      "Log Audit: halaman baru berisi jejak aksi penting — siapa melakukan apa dan kapan.",
+      "Filter log berdasarkan tanggal, pengguna, dan jenis data.",
+      "Pencatatan otomatis pada tambah/ubah/hapus transaksi, departemen, dan kas mingguan.",
+    ],
+  },
   {
     version: "2.6.0",
     date: "2026-07-15",

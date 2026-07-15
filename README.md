@@ -18,7 +18,9 @@ Migrasi SQL bernomor ada di `supabase/migrations/`. Terapkan **berurutan**:
 1. `0001_init.sql` — enum, tabel, index, trigger (updated_at, total mingguan, `handle_new_user`), dan helper RLS (SECURITY DEFINER).
 2. `0002_rls.sql` — aktifkan RLS + policy per peran.
 3. `0003_storage_bukti.sql` — bucket privat `bukti` + storage policy (upload/baca/ubah/hapus bukti per peran & departemen). Bukti dibaca lewat **signed URL** yang digenerate server; tidak ada akses publik.
-4. `supabase/seed.sql` — 8 departemen + 4 jenis kas (idempotent).
+4. `0004_transaction_status.sql` — fungsi transisi status transaksi (`verify_transaction`, `approve_transaction`, `revert_transaction`) yang sekaligus mencatat ke `audit_log`.
+5. `0005_profiles_read.sql` — gembala/sekretaris/bendahara boleh **membaca** semua profil (agar nama pelaku tampil di Log Audit & jejak verifikasi). Menulis profil tetap hanya sekretaris.
+6. `supabase/seed.sql` — 8 departemen + 4 jenis kas (idempotent).
 
 **Cara menerapkan** (pilih salah satu):
 

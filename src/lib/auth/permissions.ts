@@ -28,6 +28,7 @@ export type Action =
   | "departments.read"
   | "departments.manage"
   | "users.manage"
+  | "audit.view"
   | "export.pdf"
   | "summary.send";
 
@@ -42,6 +43,7 @@ const MATRIX: Record<Action, Role[]> = {
   "departments.read": ALL_ROLES,
   "departments.manage": ["sekretaris", "bendahara"],
   "users.manage": ["sekretaris"],
+  "audit.view": ["gembala", "sekretaris", "bendahara"],
   "export.pdf": ALL_ROLES,
   "summary.send": ["gembala", "sekretaris", "bendahara"],
 };
@@ -97,6 +99,7 @@ export type NavKey =
   | "kas-mingguan"
   | "departemen"
   | "pengguna"
+  | "audit"
   | "ekspor";
 
 export type NavItem = { key: NavKey; href: string; label: string };
@@ -109,18 +112,27 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "kas-mingguan", href: "/kas-mingguan", label: "Kas Mingguan" },
   { key: "departemen", href: "/departemen", label: "Departemen" },
   { key: "pengguna", href: "/pengguna", label: "Pengguna" },
+  { key: "audit", href: "/audit", label: "Audit" },
   { key: "ekspor", href: "/ekspor", label: "Ekspor" },
 ];
 
 /** Menu per peran (Fase 2 item 3). */
 const ROLE_NAV: Record<Role, NavKey[]> = {
-  gembala: ["dashboard", "pemasukan", "pengeluaran", "departemen", "ekspor"],
+  gembala: [
+    "dashboard",
+    "pemasukan",
+    "pengeluaran",
+    "departemen",
+    "audit",
+    "ekspor",
+  ],
   sekretaris: [
     "dashboard",
     "pemasukan",
     "pengeluaran",
     "departemen",
     "pengguna",
+    "audit",
     "ekspor",
   ],
   bendahara: [
@@ -129,6 +141,7 @@ const ROLE_NAV: Record<Role, NavKey[]> = {
     "pengeluaran",
     "kas-mingguan",
     "departemen",
+    "audit",
     "ekspor",
   ],
   // Petugas boleh ekspor (CLAUDE.md: "Ekspor PDF: semua") — datanya otomatis

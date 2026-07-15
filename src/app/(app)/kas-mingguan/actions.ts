@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { logAction } from "@/lib/audit/log";
 import { createClient } from "@/lib/supabase/server";
 import {
   weeklySchema,
@@ -51,14 +52,26 @@ export async function createWeekly(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sesi berakhir. Silakan masuk lagi." };
 
-  const { error } = await supabase.from("weekly_reports").insert({
-    // Normalisasi ke Senin di server = sumber kebenaran.
-    week_start_date: mondayOf(parsed.data.week_start_date),
-    cash_type_id: parsed.data.cash_type_id,
-    ...amountsOf(parsed.data),
-    created_by: user.id,
-  });
+  const week = mondayOf(parsed.data.week_start_date);
+  const { data, error } = await supabase
+    .from("weekly_reports")
+    .insert({
+      // Normalisasi ke Senin di server = sumber kebenaran.
+      week_start_date: week,
+      cash_type_id: parsed.data.cash_type_id,
+      ...amountsOf(parsed.data),
+      created_by: user.id,
+    })
+    .select("id")
+    .single();
   if (error) return { ok: false, error: mapDbError(error) };
+
+  await logAction(supabase, user.id, {
+    action: "create",
+    entity: "weekly_report",
+    entity_id: data?.id ?? null,
+    meta: { week_start_date: week },
+  });
 
   revalidatePath(PATH);
   return { ok: true };
@@ -79,15 +92,28 @@ export async function updateWeekly(
   }
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi berakhir. Silakan masuk lagi." };
+
+  const week = mondayOf(parsed.data.week_start_date);
   const { error } = await supabase
     .from("weekly_reports")
     .update({
-      week_start_date: mondayOf(parsed.data.week_start_date),
+      week_start_date: week,
       cash_type_id: parsed.data.cash_type_id,
       ...amountsOf(parsed.data),
     })
     .eq("id", id);
   if (error) return { ok: false, error: mapDbError(error) };
+
+  await logAction(supabase, user.id, {
+    action: "update",
+    entity: "weekly_report",
+    entity_id: id,
+    meta: { week_start_date: week },
+  });
 
   revalidatePath(PATH);
   return { ok: true };
@@ -97,8 +123,19 @@ export async function deleteWeekly(id: string): Promise<ActionResult> {
   if (!id) return { ok: false, error: "Data tidak valid." };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sesi berakhir. Silakan masuk lagi." };
+
   const { error } = await supabase.from("weekly_reports").delete().eq("id", id);
   if (error) return { ok: false, error: mapDbError(error) };
+
+  await logAction(supabase, user.id, {
+    action: "delete",
+    entity: "weekly_report",
+    entity_id: id,
+  });
 
   revalidatePath(PATH);
   return { ok: true };
