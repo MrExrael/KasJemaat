@@ -1,4 +1,4 @@
-export const APP_VERSION = "2.0.0";
+export const APP_VERSION = "2.5.0";
 
 export type ChangelogEntry = {
   version: string;
@@ -6,8 +6,57 @@ export type ChangelogEntry = {
   items: string[];
 };
 
-/** Riwayat pembaruan, terbaru di atas. */
+/**
+ * Riwayat pembaruan, terbaru di atas.
+ * KONVENSI: setiap menambah fitur baru, naikkan APP_VERSION (minor untuk fitur,
+ * patch untuk perbaikan) DAN tambahkan entri di sini — dialog "Yang Baru" akan
+ * muncul sekali otomatis untuk tiap pengguna saat versinya berubah.
+ * Bump juga "version" di package.json agar seragam.
+ */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.5.0",
+    date: "2026-07-15",
+    items: [
+      "Ekspor PDF: laporan berkop untuk rentang tanggal, kas mingguan, dan bulanan.",
+      "Tombol Ekspor PDF di halaman Pemasukan, Pengeluaran, Kas Mingguan, dan Dashboard — mengikuti filter yang sedang aktif.",
+      "Halaman Ekspor sebagai pusat unduhan laporan.",
+    ],
+  },
+  {
+    version: "2.4.0",
+    date: "2026-07-15",
+    items: [
+      "Dashboard baru: kartu Total Pemasukan, Total Pengeluaran, dan Saldo per periode.",
+      "Grafik tren pemasukan vs pengeluaran, ringkasan per jenis kas, dan daftar transaksi terbaru.",
+      "Filter periode: bulan berjalan, bulan lalu, 30 hari terakhir, atau rentang bebas.",
+    ],
+  },
+  {
+    version: "2.3.0",
+    date: "2026-07-15",
+    items: [
+      "Kas Mingguan (Bendahara): rekap persembahan mingguan per jenis kas dengan total otomatis.",
+      "Rekap ganda untuk minggu & jenis kas yang sama kini dicegah.",
+    ],
+  },
+  {
+    version: "2.2.0",
+    date: "2026-07-15",
+    items: [
+      "Alur verifikasi & persetujuan transaksi: draft menjadi terverifikasi, lalu disetujui.",
+      "Transaksi yang sudah disetujui terkunci; hanya Sekretaris yang dapat membukanya kembali disertai alasan, dan tercatat pada log audit.",
+      "Filter status serta jejak pemverifikasi pada tabel transaksi.",
+    ],
+  },
+  {
+    version: "2.1.0",
+    date: "2026-07-15",
+    items: [
+      "Halaman depan publik dengan ringkasan fitur dan tampilan aplikasi.",
+      "Perbaikan notifikasi login: pesan berhasil maupun gagal kini muncul di halaman login.",
+    ],
+  },
   {
     version: "2.0.0",
     date: "2026-07-14",
