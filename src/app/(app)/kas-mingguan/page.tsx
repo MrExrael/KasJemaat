@@ -1,39 +1,23 @@
-import { Plus } from "lucide-react";
-
-import { RoleGate } from "@/components/shared/role-gate";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { requireRouteAccess } from "@/lib/auth/session";
+import { getWeeklyData } from "@/lib/weekly/queries";
+import { WeeklyView } from "./weekly-view";
 
 export default async function KasMingguanPage() {
-  // Hanya Bendahara yang boleh membuka halaman ini.
+  // Hanya Bendahara yang boleh membuka halaman ini (RLS penjaga akhir).
   await requireRouteAccess("kas-mingguan");
+
+  const data = await getWeeklyData();
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div>
         <h1 className="font-heading text-2xl font-semibold">Kas Mingguan</h1>
-        <RoleGate action="weekly.manage">
-          <Button>
-            <Plus className="size-4" />
-            Tambah Rekap
-          </Button>
-        </RoleGate>
+        <p className="text-muted-foreground">
+          Rekap persembahan mingguan per jenis kas (Senin–Minggu).
+        </p>
       </div>
 
-      <Card className="max-w-md">
-        <CardHeader>
-          <CardTitle>Segera hadir</CardTitle>
-          <CardDescription>
-            Rekap kas mingguan dikerjakan pada fase berikutnya.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <WeeklyView data={data} />
     </div>
   );
 }
