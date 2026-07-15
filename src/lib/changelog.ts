@@ -1,4 +1,4 @@
-export const APP_VERSION = "2.5.0";
+export const APP_VERSION = "2.6.0";
 
 export type ChangelogEntry = {
   version: string;
@@ -14,6 +14,14 @@ export type ChangelogEntry = {
  * Bump juga "version" di package.json agar seragam.
  */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.6.0",
+    date: "2026-07-15",
+    items: [
+      "Kirim Ringkasan: bagikan rekap kas periode terpilih lewat WhatsApp atau Email — teks dibuat otomatis.",
+      "Tombol Salin Teks untuk menempel ringkasan ke mana saja.",
+    ],
+  },
   {
     version: "2.5.0",
     date: "2026-07-15",

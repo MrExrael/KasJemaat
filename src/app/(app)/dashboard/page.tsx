@@ -17,8 +17,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { can } from "@/lib/auth/permissions";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { getDashboardData } from "@/lib/dashboard/queries";
+import { CHURCH_NAME } from "@/lib/pdf/config";
+import { SendSummary } from "./send-summary";
 import { formatRupiah, formatTanggal } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { TxStatus } from "@/lib/validators/transaction";
@@ -75,13 +78,35 @@ export default async function DashboardPage({
             Periode {periodLabel}.
           </p>
         </div>
-        {/* Menghormati periode aktif */}
-        <ExportPdfButton
-          variant="monthly"
-          from={from}
-          to={to}
-          label="Ekspor PDF"
-        />
+        {/* Keduanya menghormati periode aktif */}
+        <div className="flex flex-wrap gap-2">
+          {can(profile.role, "summary.send") && (
+            <SendSummary
+              input={{
+                churchName: CHURCH_NAME,
+                periodLabel,
+                scopeLabel:
+                  profile.role === "petugas"
+                    ? "Lingkup: departemen Anda"
+                    : "Lingkup: semua departemen",
+                income: data.income,
+                expense: data.expense,
+                saldo: data.saldo,
+                perCashType: data.perCashType.map((c) => ({
+                  name: c.name,
+                  net: c.net,
+                })),
+                includePdfNote: true,
+              }}
+            />
+          )}
+          <ExportPdfButton
+            variant="monthly"
+            from={from}
+            to={to}
+            label="Ekspor PDF"
+          />
+        </div>
       </div>
 
       <PeriodFilter from={from} to={to} />
